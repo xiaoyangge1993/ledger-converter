@@ -1,0 +1,4 @@
+﻿automatic_payout_effective_at,automatic_payout_id,available_on_utc,balance_transaction_id,charge_id,created_utc,currency,customer_facing_amount,customer_facing_currency,description,fee,gross,net,reporting_category,source_id
+2025-03-05 00:00:00,po_SAMPLE001,2025-03-04 00:00:00,txn_SAMPLE_S1,ch_SAMPLE_S1,2025-02-20 14:03:00,usd,49.00,usd,EXAMPLE — Indie tool license,1.72,49.00,47.28,charge,ch_SAMPLE_S1
+2025-03-05 00:00:00,po_SAMPLE001,2025-03-04 00:00:00,txn_SAMPLE_S2,ch_SAMPLE_S2,2025-02-28 08:40:00,usd,49.00,usd,EXAMPLE — Indie tool license,1.72,49.00,47.28,charge,ch_SAMPLE_S2
+2025-04-05 00:00:00,po_SAMPLE002,2025-04-04 00:00:00,txn_SAMPLE_S3,ch_SAMPLE_S2,2025-03-18 12:00:00,usd,-49.00,usd,EXAMPLE — Refund for ch_SAMPLE_S2,0.00,-49.00,-49.00,refund,re_SAMPLE_S2

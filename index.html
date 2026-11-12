@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>出海收入对账 · 免费本地转换工具（不算税）</title>
+  <style>
+    :root { --navy:#0f172a; --gold:#c6a15b; --paper:#f8f4ec; --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --ok:#065f46; --warn:#92400e; }
+    * { box-sizing: border-box; }
+    body { margin:0; font: 15px/1.55 ui-sans-serif, system-ui, "Noto Sans CJK SC", "PingFang SC", sans-serif; color:var(--ink); background:radial-gradient(900px 400px at 0 0,#e8eef6,transparent 60%), var(--paper); }
+    header { background:var(--navy); color:#fff; padding:20px 28px; display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; align-items:center; }
+    header strong { font-size:18px; }
+    header span { color:#cbd5e1; font-size:13px; }
+    main { max-width:1100px; margin:0 auto; padding:24px 20px 80px; display:flex; flex-direction:column; gap:16px; }
+    .disclaimer { background:#fef3c7; border:1px solid #f59e0b; border-radius:12px; padding:12px 16px; font-size:13.5px; color:#78350f; }
+    .drop { border:2px dashed #94a3b8; border-radius:16px; background:#fff; padding:36px 20px; text-align:center; }
+    .drop.drag { border-color:var(--gold); background:#fffbeb; }
+    .drop button { background:var(--navy); color:#fff; border:0; border-radius:10px; padding:8px 16px; cursor:pointer; font-weight:600; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px 18px; }
+    .card h2 { margin:0 0 8px; font-size:16px; }
+    .warn { color:var(--warn); font-size:13.5px; margin:4px 0; }
+    .ok { color:var(--ok); }
+    table { width:100%; border-collapse:collapse; font-size:12.5px; }
+    th,td { border-bottom:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; white-space:nowrap; }
+    th { background:#f1f5f9; position:sticky; top:0; }
+    .table-wrap { overflow:auto; max-height:420px; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .actions button, .actions a.btn { background:var(--navy); color:#fff; border:0; border-radius:10px; padding:9px 16px; cursor:pointer; font-weight:600; text-decoration:none; display:inline-block; }
+    .actions button.secondary { background:#fff; color:var(--navy); border:1px solid #cbd5e1; }
+    footer { text-align:center; color:var(--muted); font-size:12px; }
+    footer a { color:#0f172a; }
+    .drop .actions button.secondary { background:#fff; color:var(--navy); border:1px solid #cbd5e1; }
+    code { background:#f1f5f9; padding:1px 5px; border-radius:4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <strong>出海收入对账 · 免费本地转换工具</strong><br />
+      <span>文件只在你的浏览器里处理，不会上传到任何服务器</span>
+    </div>
+    <span>免费精简版 · 不是税务建议</span>
+  </header>
+  <main>
+    <div class="disclaimer">
+      本工具只把支持平台的导出整理成统一字段，便于在补报或交给会计前先把账对清。它不是税务、法律或会计建议，不计算应纳税额，也不判断所得项目。当前不支持 App Store、Google AdMob 和 Google AdSense 的收入导出。无法识别的表头（例如官方未公布列名的 Gumroad / Lemon Squeezy payout 文件）不会被猜测成确定数据。
+    </div>
+    <div class="card">
+      <p style="margin:0 0 8px">支持：Gumroad 销售 CSV、Stripe payout reconciliation、PayPal Activity Download、Paddle payout reconciliation、Lemon Squeezy 订单导出。文件不会离开这台电脑。</p>
+      <p style="margin:0;color:var(--muted);font-size:13px">需要完整中文指南、带公式的 Excel 账本和示例文件时，见文末的资料包。</p>
+    </div>
+    <div class="drop" id="drop">
+      <p>把 CSV 拖到这里，或</p>
+      <button type="button" id="pick">选择文件</button>
+      <input type="file" id="file" accept=".csv,text/csv,text/plain" hidden multiple />
+      <p style="color:var(--muted);font-size:13px;margin:10px 0 8px">也可以先用下面的虚构示例走一遍流程，数字不是真实交易。</p>
+      <p class="actions" style="justify-content:center;margin:0">
+        <button type="button" class="secondary" id="sample-gumroad">试用 Gumroad 示例</button>
+        <button type="button" class="secondary" id="sample-stripe">试用 Stripe 示例</button>
+      </p>
+    </div>
+    <div class="card" id="result" hidden>
+      <h2 id="title"></h2>
+      <div id="warnings"></div>
+      <div class="actions">
+        <button type="button" id="download">下载统一格式 CSV</button>
+        <button type="button" class="secondary" id="clear">清除</button>
+      </div>
+      <p id="count" class="ok"></p>
+      <div class="table-wrap"><table id="table"></table></div>
+    </div>
+    <footer>
+      <p>本页是免费精简版，只做本地转换，不算税，也不是税务建议。</p>
+      <p>完整资料包（中文指南、Excel 账本、示例和免责声明）在 <a href="https://xiaoxiaoyang.gumroad.com/l/nfntkm?utm_source=github_pages&utm_medium=tool&utm_campaign=ledger">出海收入对账包</a>，一次性 $12。</p>
+    </footer>
+  </main>
+  <script>
+  const UNIFIED = ["is_example","platform","source_file","transaction_id","occurred_at","occurred_date","year","month","year_month","txn_type","status","description","currency","gross","fees","tax_collected","refund_amount","net_platform","net_check","payout_id","payout_date","notes","mapping_notes"];
+  const CN = {is_example:"是否示例",platform:"平台",source_file:"原始文件",transaction_id:"交易号",occurred_at:"发生时间",occurred_date:"日期",year:"年",month:"月",year_month:"年月",txn_type:"类型",status:"状态",description:"说明",currency:"币种",gross:"毛收入",fees:"平台费用",tax_collected:"代收税费",refund_amount:"退款",net_platform:"平台净额",net_check:"核对净额",payout_id:"付款编号",payout_date:"付款日期",notes:"备注",mapping_notes:"映射说明"};
+  const MARK = {
+    gumroad: ["Purchase ID","Sale Price ($)","Net Total ($)","Fees ($)"],
+    stripe: ["balance_transaction_id","reporting_category","gross","fee","net"],
+    paypal: ["Gross","Fee","Net","Transaction ID","From Email Address"],
+    paddle: ["balance_movement_in_balance_currency","balance_movement_type","total_gross_in_balance_currency"],
+    lemonsqueezy: ["identifier","order_number","date_utc","subtotal","currency_rate"]
+  };
+
+  function parseCSV(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+    const rows = [];
+    let row = [], cell = "", i = 0, q = false;
+    while (i < text.length) {
+      const c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i+1] === '"') { cell += '"'; i++; } else q = false; }
+        else cell += c;
+      } else {
+        if (c === '"') q = true;
+        else if (c === ',') { row.push(cell); cell = ""; }
+        else if (c === '\n' || (c === '\r' && text[i+1] === '\n')) {
+          row.push(cell); rows.push(row); row = []; cell = "";
+          if (c === '\r') i++;
+        } else if (c !== '\r') cell += c;
+      }
+      i++;
+    }
+    if (cell.length || row.length) { row.push(cell); rows.push(row); }
+    if (!rows.length) return {headers:[], records:[]};
+    const headers = rows[0].map(h => h.trim());
+    const records = rows.slice(1).filter(r => r.some(x => x && x.trim())).map(r => {
+      const o = {}; headers.forEach((h, idx) => o[h] = (r[idx] ?? "").trim()); return o;
+    });
+    return {headers, records};
+  }
+
+  function money(v) {
+    if (v === undefined || v === null || v === "") return 0;
+    let s = String(v).trim().replace(/\s/g,"").replace(/,/g,"");
+    if (s.startsWith("(") && s.endsWith(")")) s = "-" + s.slice(1,-1);
+    const n = Number(s);
+    return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+  }
+  function fmt(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+  function text(row, keys, d="") { for (const k of keys) { if (row[k] != null && String(row[k]).trim() !== "") return String(row[k]).trim(); } return d; }
+  function flag01(v) { return ["1","1.0","true","TRUE","yes","Yes"].includes(String(v).trim()); }
+
+  function parseDT(raw) {
+    raw = (raw || "").trim(); if (!raw) return null;
+    const pad = (x) => String(x).padStart(2,"0");
+    let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}):(\d{2}))?/);
+    if (m) return {y:m[1], mo:m[2], d:m[3], hh:m[4]||"00", mi:m[5]||"00", ss:m[6]||"00"};
+    m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}):(\d{2}))?/);
+    if (m) return {y:m[3], mo:pad(m[1]), d:pad(m[2]), hh:pad((m[4]||"00").split(":")[0]), mi:(m[4]||"00:00:00").split(":")[1]||"00", ss:(m[4]||"00:00:00").split(":")[2]||"00"};
+    const d = new Date(raw.replace("Z","+00:00"));
+    if (!isNaN(d.getTime())) {
+      return {y:String(d.getUTCFullYear()), mo:pad(d.getUTCMonth()+1), d:pad(d.getUTCDate()),
+              hh:pad(d.getUTCHours()), mi:pad(d.getUTCMinutes()), ss:pad(d.getUTCSeconds())};
+    }
+    return null;
+  }
+  function splitDT(p) {
+    if (!p) return {occurred_at:"", occurred_date:"", year:"", month:"", year_month:""};
+    return {occurred_at:`${p.y}-${p.mo}-${p.d}T${p.hh}:${p.mi}:${p.ss}`, occurred_date:`${p.y}-${p.mo}-${p.d}`, year:p.y, month:p.mo, year_month:`${p.y}-${p.mo}`};
+  }
+  function detect(headers) {
+    const hs = new Set(headers);
+    let best = "unknown", score = 0;
+    for (const [k, cols] of Object.entries(MARK)) {
+      const s = cols.filter(c => hs.has(c)).length;
+      if (s > score) { score = s; best = k; }
+    }
+    return score >= 3 ? best : "unknown";
+  }
+  function base(platform, file) {
+    const o = {}; UNIFIED.forEach(k => o[k] = "");
+    o.is_example = "否"; o.platform = platform; o.source_file = file;
+    return o;
+  }
+
+  function normGumroad(rows, file) {
+    const warnings = [
+      "Gumroad 销售 CSV 按官方帮助中心列名解析。Purchase Date 的具体字符串格式官方未给出示例。",
+      "Net Total ($) 官方定义为售价减费用，未写明是否已扣除退款；另给「核对净额」= 毛收入 − 费用 − 退款。"
+    ];
+    const out = [];
+    for (const r of rows) {
+      if (!text(r, ["Purchase ID","Order Number"])) continue;
+      const dt = parseDT((text(r,["Purchase Date"])+" "+text(r,["Purchase Time (UTC timezone)","Purchase Time"])).trim()) || parseDT(text(r,["Purchase Date"]));
+      const gross = money(r["Sale Price ($)"]);
+      const fees = money(r["Fees ($)"]) + money(r["PayPal Fee Amount"]) + money(r["Stripe Fee Amount"]);
+      const tax = money(r["Taxes ($)"]);
+      const partial = money(r["Partial Refund ($)"]);
+      const fully = flag01(r["Fully Refunded?"]);
+      const refunded = flag01(r["Refunded?"]) || fully || partial > 0;
+      const refund = (fully && partial === 0) ? gross : partial;
+      const netp = money(r["Net Total ($)"]);
+      const parts = splitDT(dt);
+      const row = Object.assign(base("Gumroad", file), parts, {
+        transaction_id: text(r,["Purchase ID"]),
+        txn_type: "销售",
+        status: fully ? "fully_refunded" : (refunded ? "refunded" : "paid"),
+        description: text(r,["Item Name"]),
+        currency: "USD",
+        gross: fmt(gross), fees: fmt(fees), tax_collected: fmt(tax),
+        refund_amount: fmt(refund), net_platform: fmt(netp),
+        net_check: fmt(gross - fees - refund),
+        notes: flag01(r["Disputed?"]) ? "Disputed?=1" : "",
+        mapping_notes: "official:gumroad-sales-csv"
+      });
+      out.push(row);
+    }
+    return {rows:out, warnings};
+  }
+
+  function normStripe(rows, file) {
+    const catMap = {charge:"销售", refund:"退款", dispute:"争议", dispute_reversal:"调整", stripe_fee:"费用", fee:"费用", payout:"提现", contribution:"调整"};
+    const warnings = ["按 Stripe payout reconciliation 官方列名解析（金额为货币主要单位）。"];
+    const out = [];
+    for (const r of rows) {
+      if (!text(r,["balance_transaction_id","source_id","charge_id"])) continue;
+      const dt = parseDT(text(r,["created_utc","created"]));
+      const cat = text(r,["reporting_category"]);
+      const txn_type = catMap[cat] || "其他";
+      const grossRaw = money(r["gross"]);
+      const fees = money(r["fee"]);
+      const netp = money(r["net"]);
+      const isRefund = cat === "refund";
+      const refund = isRefund ? Math.abs(grossRaw) : 0;
+      const gross = isRefund ? 0 : grossRaw;
+      const pdate = splitDT(parseDT(text(r,["automatic_payout_effective_at","automatic_payout_effective_at_utc"])));
+      if (!catMap[cat]) warnings.push("未预设的 reporting_category: "+cat+"，已归入其他，请人工复核");
+      out.push(Object.assign(base("Stripe", file), splitDT(dt), {
+        transaction_id: text(r,["balance_transaction_id"]),
+        txn_type, status: cat, description: text(r,["description"]),
+        currency: text(r,["currency"],"usd").toUpperCase(),
+        gross: fmt(gross), fees: fmt(fees), tax_collected: "0.00",
+        refund_amount: fmt(refund), net_platform: fmt(netp),
+        net_check: fmt(gross - fees - refund),
+        payout_id: text(r,["automatic_payout_id"]),
+        payout_date: pdate.occurred_date,
+        mapping_notes: "official:stripe-payout-reconciliation; reporting_category="+cat
+      }));
+    }
+    return {rows:out, warnings};
+  }
+
+  function paypalType(t, gross) {
+    const s = t.toLowerCase();
+    const note = "official:paypal-activity-download; Type 归类为启发式，须人工复核";
+    if (/(refund|reversal|chargeback)/.test(s)) return ["退款", note];
+    if (/(withdrawal|transfer to|general withdrawal|bank deposit)/.test(s)) return ["提现", note];
+    if (s.includes("fee") && !s.includes("payment")) return ["费用", note];
+    if (gross < 0) return ["退款", note + "; 因金额为负辅助判断"];
+    return ["销售", note];
+  }
+
+  function normPayPal(rows, file) {
+    const warnings = [
+      "PayPal Date 格式随账户国家而变（美国官方示例为 MM/DD/YYYY）。",
+      "Type 没有完整官方对照表，仅做启发式归类。提现不应计入销售收入。"
+    ];
+    const out = [];
+    for (const r of rows) {
+      if (!text(r,["Transaction ID"])) continue;
+      const dt = parseDT((text(r,["Date"])+" "+text(r,["Time"])).trim()) || parseDT(text(r,["Date"]));
+      const grossRaw = money(r["Gross"]);
+      let fees = Math.abs(money(r["Fee"]));
+      const netp = money(r["Net"]);
+      const typeS = text(r,["Type"]);
+      const [txn_type, mapNote] = paypalType(typeS, grossRaw);
+      const refund = txn_type === "退款" ? Math.abs(grossRaw) : 0;
+      let gross = ["退款","提现","费用"].includes(txn_type) ? 0 : grossRaw;
+      const parts = splitDT(dt);
+      const row = Object.assign(base("PayPal", file), parts, {
+        transaction_id: text(r,["Transaction ID"]),
+        txn_type, status: text(r,["Status"]),
+        description: text(r,["Item Title","Name","Type"]),
+        currency: text(r,["Currency"],"USD").toUpperCase(),
+        gross: fmt(gross), fees: fmt(txn_type==="提现"?0:fees), tax_collected:"0.00",
+        refund_amount: fmt(refund), net_platform: fmt(netp),
+        net_check: fmt(gross - (txn_type==="提现"?0:fees) - refund),
+        notes: "PayPal Type="+typeS,
+        mapping_notes: mapNote
+      });
+      if (txn_type === "提现") {
+        row.payout_id = text(r,["Transaction ID"]);
+        row.payout_date = parts.occurred_date;
+        row.fees = "0.00"; row.net_check = "0.00"; row.gross = "0.00";
+        row.notes += "；提现行不计入销售收入，请在到账核对中使用";
+      }
+      out.push(row);
+    }
+    return {rows:out, warnings};
+  }
+
+  function normPaddle(rows, file) {
+    const typeMap = {sale:"销售", refund:"退款", credit:"调整", chargeback:"争议", chargeback_reverse:"调整", chargeback_warning:"其他", chargeback_warning_reverse:"其他", rebate:"调整", swift_fee:"费用"};
+    const warnings = ["按 Paddle payout reconciliation 官方列解析。请用余额币种字段对账。"];
+    const out = [];
+    for (const r of rows) {
+      if (!text(r,["transaction_id","remittance_reference","balance_movement_type"])) continue;
+      const dt = parseDT(text(r,["balance_movement_date","transaction_completed_at","transaction_created_at"]));
+      const btype = text(r,["balance_movement_type"]);
+      const grossRaw = money(r["total_gross_in_balance_currency"]);
+      const tax = money(r["tax_in_balance_currency"]);
+      const fees = money(r["paddle_fee_in_balance_currency"]) + money(r["fx_fee_in_balance_currency"]) + money(r["fx_fee_precision_adjustment_in_balance_currency"]) + money(r["chargeback_fee_in_balance_currency"]) + money(r["retained_fee_in_balance_currency"]);
+      const rebates = money(r["payout_rebates_and_fees_in_balance_currency"]);
+      const netp = money(r["balance_movement_in_balance_currency"]);
+      const txn_type = typeMap[btype] || "其他";
+      const refund = txn_type === "退款" ? grossRaw : 0;
+      let gross = ["退款","费用","提现"].includes(txn_type) || ["swift_fee","rebate"].includes(btype) ? 0 : grossRaw;
+      const pdate = splitDT(parseDT(text(r,["payout_created_at"])));
+      out.push(Object.assign(base("Paddle", file), splitDT(dt), {
+        transaction_id: text(r,["transaction_id"]) || text(r,["adjustment_id"]) || btype,
+        txn_type, status: btype,
+        description: text(r,["product_name_list","reason","balance_movement_type"]),
+        currency: text(r,["balance_currency_code"],"USD").toUpperCase(),
+        gross: fmt(gross), fees: fmt(fees - rebates), tax_collected: fmt(tax),
+        refund_amount: fmt(refund), net_platform: fmt(netp), net_check: fmt(netp),
+        payout_id: text(r,["remittance_reference"]),
+        payout_date: pdate.occurred_date,
+        notes: "核对净额采用平台官方净额（已按官方公式扣税和费用）。代收税费单独列示。",
+        mapping_notes: "official:paddle-payout-reconciliation"
+      }));
+    }
+    return {rows:out, warnings};
+  }
+
+  function normLemon(rows, file) {
+    const warnings = [
+      "按 Lemon Squeezy 官方订单导出列解析。金额单位为美元美分，已除以 100。",
+      "官方订单导出没有费用、净额、退款或 payout 列，这些字段留空。payout CSV 列名未在官方文档公布。"
+    ];
+    const out = [];
+    for (const r of rows) {
+      if (!text(r,["identifier","order_number"])) continue;
+      const total = Math.round(Number(String(r["total"]||"0").replace(/,/g,"")) ) / 100;
+      const tax = Math.round(Number(String(r["tax"]||"0").replace(/,/g,"")) ) / 100;
+      const dt = parseDT(text(r,["date_utc"]));
+      const product = [text(r,["product_name"]), text(r,["variant_name"])].filter(Boolean).join(" / ");
+      out.push(Object.assign(base("Lemon Squeezy", file), splitDT(dt), {
+        transaction_id: text(r,["identifier"]) || text(r,["order_number"]),
+        txn_type: "销售", status: "", description: product, currency: "USD",
+        gross: fmt(total), fees: "", tax_collected: fmt(tax),
+        refund_amount: "", net_platform: "", net_check: "",
+        notes: "费用/净额/退款未在官方订单导出中提供，留空",
+        mapping_notes: "official:lemonsqueezy-orders; amounts-in-usd-cents; fees-not-in-official-orders-export"
+      }));
+    }
+    return {rows:out, warnings};
+  }
+
+  const FNS = {gumroad:normGumroad, stripe:normStripe, paypal:normPayPal, paddle:normPaddle, lemonsqueezy:normLemon};
+  const NAMES = {gumroad:"Gumroad 销售 CSV", stripe:"Stripe payout reconciliation", paypal:"PayPal Activity Download", paddle:"Paddle payout reconciliation", lemonsqueezy:"Lemon Squeezy 订单导出"};
+
+  let allRows = [], allWarnings = [];
+
+  function toCSV(rows) {
+    const esc = v => {
+      const s = v == null ? "" : String(v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+    };
+    return [UNIFIED.join(","), ...rows.map(r => UNIFIED.map(k => esc(r[k])).join(","))].join("\n");
+  }
+
+  function render() {
+    const box = document.getElementById("result");
+    if (!allRows.length) { box.hidden = true; return; }
+    box.hidden = false;
+    document.getElementById("title").textContent = "已转换 " + allRows.length + " 行";
+    document.getElementById("warnings").innerHTML = allWarnings.map(w => '<p class="warn">• '+w+'</p>').join("");
+    document.getElementById("count").textContent = "请抽查提现、退款和空费用行，再导入账本「统一明细」。导入后把「是否示例」改为「否」。";
+    const show = ["is_example","platform","transaction_id","occurred_date","txn_type","description","currency","gross","fees","refund_amount","net_platform","net_check"];
+    const thead = "<tr>"+show.map(k=>"<th>"+CN[k]+"</th>").join("")+"</tr>";
+    const tbody = allRows.map(r => "<tr>"+show.map(k=>"<td>"+(r[k]??"")+"</td>").join("")+"</tr>").join("");
+    document.getElementById("table").innerHTML = thead + tbody;
+  }
+
+  async function handleFiles(files) {
+    allRows = []; allWarnings = [];
+    for (const file of files) {
+      const text = await file.text();
+      const {headers, records} = parseCSV(text);
+      const plat = detect(headers);
+      if (plat === "unknown") {
+        allWarnings.push(file.name + "：无法根据表头识别平台。Gumroad / Lemon Squeezy 的 payout CSV 列名未在官方文档公布，请手工映射或把付款总额记入「到账核对」。表头：" + headers.slice(0,12).join(", "));
+        continue;
+      }
+      const {rows, warnings} = FNS[plat](records, file.name);
+      rows.forEach(r => { r.source_file = file.name; });
+      allRows.push(...rows);
+      allWarnings.push("已识别 "+file.name+" 为 "+NAMES[plat]+"，"+rows.length+" 行。");
+      warnings.forEach(w => allWarnings.push(w));
+    }
+    render();
+  }
+
+  const drop = document.getElementById("drop");
+  const input = document.getElementById("file");
+  drop.addEventListener("dragover", e => { e.preventDefault(); drop.classList.add("drag"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
+  drop.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("drag"); handleFiles(e.dataTransfer.files); });
+  document.getElementById("pick").addEventListener("click", () => input.click());
+  input.addEventListener("change", e => handleFiles(e.target.files));
+  document.getElementById("clear").addEventListener("click", () => { allRows=[]; allWarnings=[]; render(); input.value=""; });
+  document.getElementById("download").addEventListener("click", () => {
+    const blob = new Blob([toCSV(allRows)], {type:"text/csv;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "unified-ledger.csv";
+    a.click();
+  });
+  async function loadSample(path, name) {
+    const res = await fetch(path);
+    if (!res.ok) { alert("示例文件加载失败，请改用自己的 CSV。"); return; }
+    const text = await res.text();
+    const file = new File([text], name, {type:"text/csv"});
+    handleFiles([file]);
+  }
+  document.getElementById("sample-gumroad").addEventListener("click", () => loadSample("gumroad-sales.example.csv", "gumroad-sales.example.csv"));
+  document.getElementById("sample-stripe").addEventListener("click", () => loadSample("stripe-payout-reconciliation.example.csv", "stripe-payout-reconciliation.example.csv"));
+  </script>
+</body>
+</html>
