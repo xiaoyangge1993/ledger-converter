@@ -6,4 +6,4 @@
 
 完整资料包：https://xiaoxiaoyang.gumroad.com/l/nfntkm
 
-计划公开地址（待 Kevin 审过后用 GitHub Pages 发布）：https://xiaoyangge1993.github.io/ledger-converter/
+公开地址：https://xiaoyangge1993.github.io/ledger-converter/
