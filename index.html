@@ -129,8 +129,8 @@
     const pad = (x) => String(x).padStart(2,"0");
     let m = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}):(\d{2}))?/);
     if (m) return {y:m[1], mo:m[2], d:m[3], hh:m[4]||"00", mi:m[5]||"00", ss:m[6]||"00"};
-    m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}):(\d{2}))?/);
-    if (m) return {y:m[3], mo:pad(m[1]), d:pad(m[2]), hh:pad((m[4]||"00").split(":")[0]), mi:(m[4]||"00:00:00").split(":")[1]||"00", ss:(m[4]||"00:00:00").split(":")[2]||"00"};
+    m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+    if (m) return {y:m[3], mo:pad(m[1]), d:pad(m[2]), hh:pad(m[4]||"00"), mi:pad(m[5]||"00"), ss:pad(m[6]||"00")};
     const d = new Date(raw.replace("Z","+00:00"));
     if (!isNaN(d.getTime())) {
       return {y:String(d.getUTCFullYear()), mo:pad(d.getUTCMonth()+1), d:pad(d.getUTCDate()),
@@ -343,16 +343,21 @@
     return [UNIFIED.join(","), ...rows.map(r => UNIFIED.map(k => esc(r[k])).join(","))].join("\n");
   }
 
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
   function render() {
     const box = document.getElementById("result");
-    if (!allRows.length) { box.hidden = true; return; }
+    if (!allRows.length && !allWarnings.length) { box.hidden = true; return; }
     box.hidden = false;
-    document.getElementById("title").textContent = "已转换 " + allRows.length + " 行";
-    document.getElementById("warnings").innerHTML = allWarnings.map(w => '<p class="warn">• '+w+'</p>').join("");
-    document.getElementById("count").textContent = "请抽查提现、退款和空费用行，再导入账本「统一明细」。导入后把「是否示例」改为「否」。";
+    document.getElementById("title").textContent = allRows.length ? ("已转换 " + allRows.length + " 行") : "未能转换出明细行";
+    document.getElementById("warnings").innerHTML = allWarnings.map(w => '<p class="warn">• '+escapeHtml(w)+'</p>').join("");
+    document.getElementById("count").textContent = allRows.length ? "请抽查提现、退款和空费用行，再导入账本「统一明细」。导入后把「是否示例」改为「否」。" : "";
+    document.getElementById("download").hidden = !allRows.length;
     const show = ["is_example","platform","transaction_id","occurred_date","txn_type","description","currency","gross","fees","refund_amount","net_platform","net_check"];
+    if (!allRows.length) { document.getElementById("table").innerHTML = ""; return; }
     const thead = "<tr>"+show.map(k=>"<th>"+CN[k]+"</th>").join("")+"</tr>";
-    const tbody = allRows.map(r => "<tr>"+show.map(k=>"<td>"+(r[k]??"")+"</td>").join("")+"</tr>").join("");
+    const tbody = allRows.map(r => "<tr>"+show.map(k=>"<td>"+escapeHtml(r[k]??"")+"</td>").join("")+"</tr>").join("");
     document.getElementById("table").innerHTML = thead + tbody;
   }
 
